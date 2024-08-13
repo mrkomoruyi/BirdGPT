@@ -4,7 +4,6 @@ import streamlit as st
 from PIL import Image
 import torch
 import torchvision.transforms.v2 as transforms
-import torch
 
 # Load the pre-trained image recognition model
 model = torch.jit.load(r"BirdGPT scripted.pth", map_location='cpu')
