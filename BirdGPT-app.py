@@ -1,6 +1,6 @@
-# streamlit_image_recognition.py
-
 import streamlit as st
+import requests
+import os
 from PIL import Image
 import torch
 import torchvision.transforms.v2 as transforms
@@ -535,25 +535,52 @@ classes = ['ABBOTTS BABBLER',
  'YELLOW HEADED BLACKBIRD',
  'ZEBRA DOVE']
 
-st.title("Bird Recognition With **BirdGPT**")
-
+st.set_page_config(layout="centered", page_title="Bird Recognition With BirdGPT",menu_items={
+    'Report a bug': "https://github.com/mrkomoruyi/BirdGPT/issues/new", 
+    'About': "#### This is BirdGPT. An AI bird recognition model. Upload or provide link to an image of a bird and find out it's name! Cool right? :smile:"})
+st.title("Bird Recognition With BirdGPT")
 # Upload an image
-uploaded_image = st.file_uploader("Upload an image", type=["jpg", "png"])
+st.write("### :bird: Upload an image of any bird and find out its name!")
+uploaded_image = st.file_uploader("##### Upload an image", type=["jpg", "png", "jpeg"])
 
-if uploaded_image:
-    image = Image.open(uploaded_image)
+uploaded_url = st.text_input("##### Or Enter the URL to the image :link:", placeholder='e.g https://.../golden-eagle.jpg')
+
+@st.fragment
+def get_input():
+    if uploaded_url:
+        if not uploaded_url.endswith(('.jpg', '.png', '.jpeg')):
+            st.error('Provided link not in accepted format. Link must end in either of: ***.jpg***, .***png*** or ***jpeg***')
+            st.stop()
+        user_img_path = 'user_img.jpg'
+        with open(user_img_path, 'wb') as f:
+            st.success('Downloading Image...')
+            request = requests.get(uploaded_url)
+            f.write(request.content)
+            f.close()
+        image = Image.open(user_img_path).convert("RGB")
+    else:
+        image = Image.open(uploaded_image).convert("RGB")
     st.image(image, caption="Uploaded Image", use_column_width=True)
-
+    #delete the downloaded image gotten from the url
+    if uploaded_url:
+        os.remove(user_img_path)
     # Preprocess the image
     transform = transforms.Compose([
         transforms.Resize((224,224)),
         transforms.ToImage(),
         transforms.ToDtype(torch.float32, scale = True)
 ])
-    input_tensor = transform(image).unsqueeze(0)
+    return transform(image).unsqueeze(0)
 
+if uploaded_image or uploaded_url:
+    input_tensor = get_input()
     # Get model prediction
     with torch.inference_mode():
         output = model(input_tensor).squeeze()
-        predicted_class = output.argmax(0)
-        st.write(f"This is a : ***{classes[predicted_class.item()].title()}***")
+        prediction_prob = output.softmax(0).max().item()
+        predicted_class = output.argmax(0).item()
+        st.write(f"###### This is a : ***{classes[predicted_class].title()}***")
+        if prediction_prob >= 0.50:
+            st.write(f"###### ***{prediction_prob*100:.1f}%*** confidence")
+        else:
+            st.write(f"###### ***{prediction_prob*100:.1f}%*** confidence. Please verify as model could be wrong here!")
