@@ -6,13 +6,10 @@ import torch
 import torchvision.transforms.v2 as transforms
 import torch
 
-# Load your pre-trained PyTorch image recognition model
-model = torch.jit.load(r"C:\dev\PYTHON ENV\ML_Models\BirdGPT scripted.pth", map_location='cpu')
+# Load the pre-trained image recognition model
+model = torch.jit.load(r"BirdGPT scripted.pth", map_location='cpu')
 model.eval()
 
-# with open('C:/dev/PYTHON ENV/ML_Models/classes.txt', 'rt') as f:
-#     classes = f.read()
-#     classes = list(classes.split('\n'))
 classes = ['ABBOTTS BABBLER',
  'ABBOTTS BOOBY',
  'ABYSSINIAN GROUND HORNBILL',
@@ -539,7 +536,7 @@ classes = ['ABBOTTS BABBLER',
  'YELLOW HEADED BLACKBIRD',
  'ZEBRA DOVE']
 
-st.title("Bird Recognition With BirdGPT")
+st.title("Bird Recognition With **BirdGPT**")
 
 # Upload an image
 uploaded_image = st.file_uploader("Upload an image", type=["jpg", "png"])
@@ -560,4 +557,4 @@ if uploaded_image:
     with torch.inference_mode():
         output = model(input_tensor).squeeze()
         predicted_class = output.argmax(0)
-        st.write(f"This is a : *{classes[predicted_class.item()].title()}*")
+        st.write(f"This is a : ***{classes[predicted_class.item()].title()}***")
