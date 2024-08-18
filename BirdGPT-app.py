@@ -5,6 +5,15 @@ from PIL import Image
 import torch
 import torchvision.transforms.v2 as transforms
 
+# Streamlit page configuration
+st.set_page_config(layout="centered", page_title="Bird Recognition With BirdGPT",menu_items={
+    'Report a bug': "https://github.com/mrkomoruyi/BirdGPT/issues/new", 
+    'About': "#### This is BirdGPT. An AI bird recognition model. Upload or provide link to an image of a bird and find out it's name! Cool right? :smile:"})
+
+st.title("Bird Recognition With :blue[BirdGPT]", anchor='title')
+st.write("### :bird: Upload an image of any bird and find out its name!")
+st.warning('BirdGPT uses AI! Check for mistakes')
+
 # Load the pre-trained image recognition model
 model = torch.jit.load("BirdGPT scripted.pth", map_location='cpu')
 model.eval()
@@ -535,20 +544,17 @@ classes = ['ABBOTTS BABBLER',
  'YELLOW HEADED BLACKBIRD',
  'ZEBRA DOVE']
 
-st.set_page_config(layout="centered", page_title="Bird Recognition With BirdGPT",menu_items={
-    'Report a bug': "https://github.com/mrkomoruyi/BirdGPT/issues/new", 
-    'About': "#### This is BirdGPT. An AI bird recognition model. Upload or provide link to an image of a bird and find out it's name! Cool right? :smile:"})
-st.title("Bird Recognition With :blue[BirdGPT]", anchor='title')
 
-# Upload an image
-st.write("### :bird: Upload an image of any bird and find out its name!")
-st.warning('BirdGPT uses AI! Check for mistakes')
-
-uploaded_image = st.file_uploader("##### Upload an image :camera:", type=["jpg", "png", "jpeg"])
+upload_methods = ['Camera', 'Upload image', 'Use URL to image online']
+upload_method = st.selectbox('Select an image input method', options=upload_methods, index=None, placeholder='e.g Camera to take photo of bird live')
+uploaded_image = None
 uploaded_url = None
 
-# st.write('###### You can also provide the URL of the image instead.')
-if st.checkbox('Use URL', help= 'Use URL of an image.'):
+if upload_method == upload_methods[0]:
+    uploaded_image = st.camera_input('Snap the bird!')
+elif upload_method == upload_methods[1]:
+    uploaded_image = st.file_uploader("##### Upload an image :camera:", type=["jpg", "png", "jpeg"])
+elif upload_method == upload_methods[2]:
     uploaded_url = st.text_input("##### Enter the URL to the image :link:", placeholder='e.g https://.../golden-eagle.jpg')
 
 def get_input():
@@ -556,12 +562,12 @@ def get_input():
         if not uploaded_url.endswith(('.jpg', '.png', '.jpeg')):
             st.error('Provided link not in acceptable format. Link must end in one of: ***.jpg***, .***png*** or ***jpeg***')
             st.stop()
-
-        st.success('Fetching image...')
-        request = requests.get(uploaded_url)
-        image = Image.open(BytesIO(request.content)).convert("RGB")
+        with st.spinner('Fetching Image...'):
+            request = requests.get(uploaded_url)
+            image = Image.open(BytesIO(request.content)).convert("RGB")
     else:
         image = Image.open(uploaded_image).convert("RGB")
+
     st.image(image, caption="Uploaded Image", use_column_width=True)
 
     # Preprocess the image
@@ -575,14 +581,20 @@ def get_prediction(input_tensor):
     # Get model prediction
     with torch.inference_mode():
         output = model(input_tensor).squeeze()
-        prediction_prob = output.softmax(0).max().item()
-        predicted_class = output.argmax(0).item()
+        prediction_probs, class_idxs = output.softmax(0).sort(descending=True)
+        top3_class_idxs, top3_prediction_probs = class_idxs[:3], prediction_probs[:3]
+        predicted_class, predicted_class_prob = top3_class_idxs[0].item(), top3_prediction_probs[0]
     st.write(f"###### This is a/an : ***{classes[predicted_class].title()}***")
-    if prediction_prob >= 0.50:
-        st.write(f"###### ***{int(prediction_prob*100)}%*** confidence")
-    else:
-        st.write(f"###### ***{int(prediction_prob*100)}%*** confidence. Please verify as model could be wrong here!")
-    # return prediction_prob, predicted_class
+    if predicted_class_prob >= 0.70:
+        st.write(f"###### :green[***{int(predicted_class_prob*100)}%***] confidence")
+    elif predicted_class_prob < 0.70:
+        if predicted_class_prob >= 0.50:
+            st.write(f"###### :orange[***{int(predicted_class_prob*100)}%***] confidence")
+        else:
+            st.write(f"###### :red[***{int(predicted_class_prob*100)}%***] confidence. Please verify as model could be wrong here!")
+        st.write('It could also be one of these:')
+        for idx in range(1, len(top3_class_idxs)):
+            st.write(f'* {classes[top3_class_idxs[idx]].title()} - :red[***{int(top3_prediction_probs[idx]*100)}%***] confidence')
 
 if uploaded_image or uploaded_url:
     input_tensor = get_input()
